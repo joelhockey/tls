@@ -1,17 +1,23 @@
 /*
- * Copyright 2001 Joel Hockey (joel.hockey@gmail.com).  All rights reserved.
+ * Copyright 2001-2011 Joel Hockey (joel.hockey@gmail.com).  All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * THIS SOURCE CODE IS PROVIDED BY JOEL HOCKEY WITH A 30-DAY MONEY BACK
- * GUARANTEE.  IF THIS CODE DOES NOT MEAN WHAT IT SAYS IT MEANS WITHIN THE
- * FIRST 30 DAYS, SIMPLY RETURN THIS CODE IN ORIGINAL CONDITION FOR A PARTIAL
- * REFUND.  IN ADDITION, I WILL REFORMAT THIS CODE USING YOUR PREFERRED
- * BRACE-POSITIONING AND INDENTATION.  THIS WARRANTY IS VOID IF THE CODE IS
- * FOUND TO HAVE BEEN COMPILED.  NO FURTHER WARRANTY IS OFFERED.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 
 package com.joelhockey.tls;
@@ -21,17 +27,11 @@ import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Random;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 /**
  * Handles the TLS Handshake protocol
- *
  * @author		Joel Hockey
  */
 public class Handshake {
-    private static final Log log = LogFactory.getLog(Handshake.class);
-    // Class variables.
 
     // Header types
     private final byte HELLO_REQUEST       = 0;
@@ -47,39 +47,37 @@ public class Handshake {
 
     // Instance variables.
 
-    private TLSSocket m_tlsSocket;
-    private Record m_record;
-    private RSA m_rsa;
-    private MessageDigest m_md5;
-    private MessageDigest m_sha;
-    private MessageDigest m_tempMD;
-    private ByteArrayOutputStream m_baos;
-    private boolean m_resumingOldSession = false;
-    private PRF m_prf;
-    private Random m_randomGenerator;
-    private byte[] m_clientRandom;
-    private byte[] m_serverRandom;
-    private byte[] m_masterSecret;
-    private byte[] m_sessionID;
-    private int m_cipherSuite;
+    private Record record;
+    private RSA rsa;
+    private MessageDigest md5;
+    private MessageDigest sha;
+    private MessageDigest tempMD;
+    private ByteArrayOutputStream baos;
+    private boolean resumingOldSession = false;
+    private PRF prf;
+    private Random randomGenerator;
+    private byte[] clientRandom;
+    private byte[] serverRandom;
+    private byte[] masterSecret;
+    private byte[] sessionID;
+    private int cipherSuite;
 
     // variables used for message buffering
-    private byte[] m_msgs = {};
-    private int m_offset = 0;
+    private byte[] msgs = {};
+    private int offset = 0;
 
     /**
      * Class constructor.
      */
     public Handshake(TLSSocket tlsSocket) throws TLSException {
         try {
-            m_tlsSocket = tlsSocket;
-            m_record = tlsSocket.getRecord();
-            m_md5 = MessageDigest.getInstance("MD5");
-            m_sha = MessageDigest.getInstance("SHA");
-            m_baos = new ByteArrayOutputStream();
-            m_prf = new PRF();
-            m_rsa = new RSA();
-            m_randomGenerator = new Random();
+            record = tlsSocket.getRecord();
+            md5 = MessageDigest.getInstance("MD5");
+            sha = MessageDigest.getInstance("SHA");
+            baos = new ByteArrayOutputStream();
+            prf = new PRF();
+            rsa = new RSA();
+            randomGenerator = new Random();
         } catch (Exception e) {
             e.printStackTrace();
             throw new TLSException("Error constructing Handshake");
@@ -90,12 +88,12 @@ public class Handshake {
      * Start the TLS Handshake protocol.
      */
     public void handshake() throws TLSException {
-        m_md5.reset();
-        m_sha.reset();
+        md5.reset();
+        sha.reset();
 
         sendClientHello();
         readServerHello();
-        if (m_resumingOldSession) {
+        if (resumingOldSession) {
             readChangeCipherSpec();
             readFinished();
             sendChangeCipherSpec();
@@ -120,38 +118,38 @@ public class Handshake {
     private byte[] getMsg() throws TLSException {
         int length = 0;
 
-        if (m_offset == m_msgs.length) {
-            m_msgs = m_record.readRecord();
-            m_offset = 0;
+        if (offset == msgs.length) {
+            msgs = record.readRecord();
+            offset = 0;
         }
 
         // check if there's enough data to include handshake header
-        while (m_msgs.length < m_offset + 4) {
-            m_baos.reset();
-            m_baos.write(m_msgs, m_offset, m_msgs.length - m_offset);
-            byte[] temp = m_record.readRecord();
-            m_baos.write(temp, 0, temp.length);
-            m_msgs = m_baos.toByteArray();
-            m_offset = 0;
+        while (msgs.length < offset + 4) {
+            baos.reset();
+            baos.write(msgs, offset, msgs.length - offset);
+            byte[] temp = record.readRecord();
+            baos.write(temp, 0, temp.length);
+            msgs = baos.toByteArray();
+            offset = 0;
         }
 
         // get the length
-        length = (m_msgs[m_offset + 1] & 0xFF) << 16 |
-            (m_msgs[m_offset + 2] & 0xFF) << 8  | (m_msgs[m_offset + 3] & 0xFF);
+        length = (msgs[offset + 1] & 0xFF) << 16 |
+            (msgs[offset + 2] & 0xFF) << 8  | (msgs[offset + 3] & 0xFF);
 
         // check that there's enough data for message
-        while (m_msgs.length < m_offset + 4 + length) {
-            m_baos.reset();
-            m_baos.write(m_msgs, m_offset, m_msgs.length - m_offset);
-            byte[] temp = m_record.readRecord();
-            m_baos.write(temp, 0, temp.length);
-            m_msgs = m_baos.toByteArray();
-            m_offset = 0;
+        while (msgs.length < offset + 4 + length) {
+            baos.reset();
+            baos.write(msgs, offset, msgs.length - offset);
+            byte[] temp = record.readRecord();
+            baos.write(temp, 0, temp.length);
+            msgs = baos.toByteArray();
+            offset = 0;
         }
 
         byte msg[] = new byte[length + 4];
-        System.arraycopy(m_msgs, m_offset, msg, 0, length + 4);
-        m_offset += length + 4;
+        System.arraycopy(msgs, offset, msg, 0, length + 4);
+        offset += length + 4;
         return msg;
     }
 
@@ -160,60 +158,39 @@ public class Handshake {
      */
     private void sendClientHello() throws TLSException {
         // Handshake Header.  Set length to zero for now
-        m_baos.reset();
+        baos.reset();
         byte[] header = {CLIENT_HELLO, 0x00, 0x00, 0x00};
         try {
-            m_baos.write(header);
+            baos.write(header);
 
             // create the client Random
-            m_clientRandom = getRandom();
+            clientRandom = getRandom();
 
             // Put message in baos
-            m_baos.write(m_tlsSocket.PROTOCOL_VERSION);
-            m_baos.write(m_clientRandom);
-            if (m_sessionID == null) {
-                m_baos.write(0);
+            baos.write(TLSSocket.PROTOCOL_VERSION);
+            baos.write(clientRandom);
+            if (sessionID == null) {
+                baos.write(0);
             } else {
-                m_baos.write((byte) m_sessionID.length);
-                m_baos.write(m_sessionID);
+                baos.write((byte) sessionID.length);
+                baos.write(sessionID);
             }
-            m_baos.write(m_tlsSocket.CIPHER_SUITE);
-            m_baos.write(m_tlsSocket.COMPRESSION_METHOD);
-//m_baos.reset();
-//m_clientRandom = new byte[] {
-//        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-//        3,1,4,1,5,9,2,6,5,3,5,8,9,7,9,3};
-//byte[] v2hello = {
-//        0x01, // clienthello
-//        0x03,0x01, // 3.1
-//        0x00,0x03, // cipherSpecLen
-//        0x00,0x00, // sessionIdLen
-//        0x00,0x10, // challenge len
-//        0x00,0x00,0x0a, // cipher des3-cbc-sha
-//        3,1,4,1,5,9,2,6,5,3,5,8,9,7,9,3 // 16 challenge data
-//};
-//updateHashes(v2hello);
-//byte[] v2helloWithHeader = new byte[v2hello.length + 2];
-//v2helloWithHeader[0] = (byte) 0x80;
-//v2helloWithHeader[1] = (byte) v2hello.length;
-//System.arraycopy(v2hello, 0, v2helloWithHeader, 2, v2hello.length);
-//m_record.m_os.write(v2helloWithHeader);
-//m_record.m_os.flush();
-//if (true) return;
+            baos.write(TLSSocket.CIPHER_SUITE);
+            baos.write(TLSSocket.COMPRESSION_METHOD);
         } catch (Exception e) {
             e.printStackTrace();
             throw new TLSException("Error in Handshake.sendClientHello: " + e.getMessage());
         }
 
         // convert to an array and set length field, then send it.
-        byte[] msg = m_baos.toByteArray();
+        byte[] msg = baos.toByteArray();
         int msgLength = msg.length - 4; // 4 byte header at start
         msg[3] = (byte) msgLength;
         msg[2] = (byte) (msgLength >> 8);
         msg[1] = (byte) (msgLength >> 16);
 
         updateHashes(msg);
-        m_record.sendMessage(Record.CONTENTTYPE_HANDSHAKE, msg);
+        record.sendMessage(Record.CONTENTTYPE_HANDSHAKE, msg);
     }
 
     /**
@@ -233,35 +210,35 @@ public class Handshake {
 
         // Read the ServerHello
         // check ProtocolVersion
-        if (msg[offset] != m_tlsSocket.PROTOCOL_VERSION[0] ||
-                msg[offset + 1] != m_tlsSocket.PROTOCOL_VERSION[1]) {
+        if (msg[offset] != TLSSocket.PROTOCOL_VERSION[0] ||
+                msg[offset + 1] != TLSSocket.PROTOCOL_VERSION[1]) {
 
             throw new TLSException("Bad ProtocolVersion in ServerHello");
         }
         offset += 2;
 
         // get the ServerRandom
-        m_serverRandom = new byte[32];
-        System.arraycopy(msg, offset, m_serverRandom, 0, 32);
+        serverRandom = new byte[32];
+        System.arraycopy(msg, offset, serverRandom, 0, 32);
         offset += 32;
 
         // get the SessionID.  First byte is length of sessionID
         int sessionIDLength = msg[offset++];
-        byte[] sessionID = new byte[sessionIDLength];
-        System.arraycopy(msg, offset, sessionID, 0, sessionIDLength);
+        byte[] newSessionID = new byte[sessionIDLength];
+        System.arraycopy(msg, offset, newSessionID, 0, sessionIDLength);
         offset += sessionIDLength;
-        
+
         // read cipherSuite
-        m_cipherSuite = msg[offset++] << 8 | msg[offset++];
+        cipherSuite = msg[offset++] << 8 | msg[offset++];
 
         // Check if we are resuming an old session.  Assume we are.
-        m_resumingOldSession = true;
+        resumingOldSession = true;
 
-        m_resumingOldSession = Arrays.equals(m_sessionID, sessionID);
-        m_sessionID = sessionID;
+        resumingOldSession = Arrays.equals(sessionID, newSessionID);
+        sessionID = newSessionID;
 
         // generate keys now if we're resuming old session
-        if (m_resumingOldSession) {
+        if (resumingOldSession) {
             generateKeys();
         }
 
@@ -288,7 +265,7 @@ public class Handshake {
                 | (msg[offset + 1] & 0xFF) << 8
                 | (msg[offset + 2] & 0xFF);
         offset += 3;
-log.debug("all certs len: " + Integer.toHexString(allCertsLength));
+Record.log("all certs len: " + Integer.toHexString(allCertsLength));
 
         // check that msg is long enough
         int certStop = allCertsLength + offset;
@@ -298,7 +275,7 @@ log.debug("all certs len: " + Integer.toHexString(allCertsLength));
 
         // skip first 3 bytes of len
         offset += 3;
-        m_rsa.setCertificates(msg, offset, msg.length - offset);
+        rsa.setCertificates(msg, offset, msg.length - offset);
 
         updateHashes(msg);
     }
@@ -329,30 +306,30 @@ log.debug("all certs len: " + Integer.toHexString(allCertsLength));
     private void sendClientKeyExchange() throws TLSException {
         try {
             // Handshake Header.  Set length to zero for now
-            m_baos.reset();
+            baos.reset();
             byte[] header = {CLIENT_KEY_EXCHANGE, 0x00, 0x00, 0x00};
-            m_baos.write(header);
+            baos.write(header);
 
             // Set the PreMasterSecret
             byte[] preMasterSecret = new byte[48];
-            m_randomGenerator.nextBytes(preMasterSecret);
-            System.arraycopy(m_tlsSocket.PROTOCOL_VERSION, 0, preMasterSecret, 0, 2);
+            randomGenerator.nextBytes(preMasterSecret);
+            System.arraycopy(TLSSocket.PROTOCOL_VERSION, 0, preMasterSecret, 0, 2);
 
             // encrypt the PreMasterSecret
-            byte[] encrypted = m_rsa.encrypt(preMasterSecret); 
-            
+            byte[] encrypted = rsa.encrypt(preMasterSecret);
+
             // write 2 byte len of EncryptedPreMasterSecret vector.
-            m_baos.write(new byte[] {(byte) (encrypted.length >> 8), (byte) encrypted.length});
-            m_baos.write(encrypted);
-            
+            baos.write(new byte[] {(byte) (encrypted.length >> 8), (byte) encrypted.length});
+            baos.write(encrypted);
+
             // convert ByteArrayOutputStream to ByteArray and set length fields
-            byte[] msg = m_baos.toByteArray();
+            byte[] msg = baos.toByteArray();
             int msgLength = msg.length - 4; // 4 byte header at start
             msg[1] = (byte) (msgLength >> 16);
             msg[2] = (byte) (msgLength >> 8);
             msg[3] = (byte) msgLength;
 
-            m_record.sendMessage(Record.CONTENTTYPE_HANDSHAKE, msg);
+            record.sendMessage(Record.CONTENTTYPE_HANDSHAKE, msg);
 
             // generate MasterSecret and keys
             generateMasterSecret(preMasterSecret);
@@ -370,8 +347,8 @@ log.debug("all certs len: " + Integer.toHexString(allCertsLength));
      */
     private void sendChangeCipherSpec() throws TLSException {
         // No headers here, just one byte to send, the value 0x01.
-        m_record.sendMessage(Record.CONTENTTYPE_CHANGE_CIPHER_SPEC, new byte[]{1});
-        m_record.changeClientWriteState();
+        record.sendMessage(Record.CONTENTTYPE_CHANGE_CIPHER_SPEC, new byte[]{1});
+        record.changeClientWriteState();
     }
 
     /**
@@ -379,22 +356,22 @@ log.debug("all certs len: " + Integer.toHexString(allCertsLength));
      */
     private void sendFinished() throws TLSException {
         try {
-            m_baos.reset();
+            baos.reset();
             // Handshake Header.  Set length to 12
             byte[] header = {FINISHED, 0x00, 0x00, 0x0C};
-            m_baos.write(header);
+            baos.write(header);
 
             // concatenate MD5(handshake_messages) and SHA(handshake_messages)
             byte[] temp = new byte[36];
-            m_tempMD = (MessageDigest) m_md5.clone();
-            System.arraycopy(m_tempMD.digest(), 0, temp, 0, 16);
-            m_tempMD = (MessageDigest) m_sha.clone();
-            System.arraycopy(m_tempMD.digest(), 0, temp, 16, 20);
+            tempMD = (MessageDigest) md5.clone();
+            System.arraycopy(tempMD.digest(), 0, temp, 0, 16);
+            tempMD = (MessageDigest) sha.clone();
+            System.arraycopy(tempMD.digest(), 0, temp, 16, 20);
 
-            m_baos.write(m_prf.getBytes(m_masterSecret, "client finished", temp, 12));
+            baos.write(prf.getBytes(masterSecret, "client finished", temp, 12));
 
-            byte[] msg = m_baos.toByteArray();
-            m_record.sendMessage(Record.CONTENTTYPE_HANDSHAKE, msg);
+            byte[] msg = baos.toByteArray();
+            record.sendMessage(Record.CONTENTTYPE_HANDSHAKE, msg);
 
             updateHashes(msg);
         } catch (Exception e) {
@@ -406,11 +383,11 @@ log.debug("all certs len: " + Integer.toHexString(allCertsLength));
      * Read a ChangeCipherSpec message.  (The single byte 0x01)
      */
     private void readChangeCipherSpec() throws TLSException {
-        byte[] msg = m_record.readRecord();
+        byte[] msg = record.readRecord();
         if (msg == null || msg.length != 1 || msg[0] != 0x01) {
             throw new TLSException("Got bad ChangeCipherSpec message");
         }
-        m_record.changeServerWriteState();
+        record.changeServerWriteState();
     }
 
     /**
@@ -435,17 +412,17 @@ log.debug("all certs len: " + Integer.toHexString(allCertsLength));
         byte[] temp = new byte[36];
         try {
             // concatenate MD5(handshake_msg) and SHA(handshake_msg)
-            m_tempMD = (MessageDigest) m_md5.clone();
-            System.arraycopy(m_tempMD.digest(), 0, temp, 0, 16);
-            m_tempMD = (MessageDigest) m_sha.clone();
-            System.arraycopy(m_tempMD.digest(), 0, temp, 16, 20);
+            tempMD = (MessageDigest) md5.clone();
+            System.arraycopy(tempMD.digest(), 0, temp, 0, 16);
+            tempMD = (MessageDigest) sha.clone();
+            System.arraycopy(tempMD.digest(), 0, temp, 16, 20);
         } catch (Exception e) {
             e.printStackTrace();
             throw new TLSException("Error clongin message digest in Handshake.readFinsihed()");
         }
 
-        byte[] shouldBe = m_prf.getBytes(m_masterSecret, "server finished", temp, 12);
-log.debug("expected hashes: " + Hex.b2s(shouldBe));
+        byte[] shouldBe = prf.getBytes(masterSecret, "server finished", temp, 12);
+Record.log("expected hashes: " + Hex.b2s(shouldBe));
 
         // verify the 12 bytes
         for (int i = 0; i < 12; i++) {
@@ -458,13 +435,11 @@ log.debug("expected hashes: " + Hex.b2s(shouldBe));
 
     /**
      * Returns the Random struct as a byte array
-     *
      * @return	the Random stuct
-     *
      */
     private byte[] getRandom() {
         byte[] random = new byte[32];
-        m_randomGenerator.nextBytes(random);
+        randomGenerator.nextBytes(random);
         long gmt_unix_time = System.currentTimeMillis() / 1000;
         random[3] = (byte) gmt_unix_time;
         random[2] = (byte) (gmt_unix_time >> 8);
@@ -479,14 +454,14 @@ log.debug("expected hashes: " + Hex.b2s(shouldBe));
      */
     private void generateMasterSecret(byte[] preMasterSecret) throws TLSException {
         byte[] randoms = new byte[64];
-        System.arraycopy(m_clientRandom, 0, randoms, 0, 32);
-        System.arraycopy(m_serverRandom, 0, randoms, 32, 32);
+        System.arraycopy(clientRandom, 0, randoms, 0, 32);
+        System.arraycopy(serverRandom, 0, randoms, 32, 32);
 
-        m_masterSecret = m_prf.getBytes(preMasterSecret, "master secret", randoms, 48);
-log.debug("clientRandom   : " + Hex.b2s(m_clientRandom));
-log.debug("serverRandom   : " + Hex.b2s(m_serverRandom));
-log.debug("PreMasterSecret: " + Hex.b2s(preMasterSecret));
-log.debug("MasterSecret   : " + Hex.b2s(m_masterSecret));
+        masterSecret = prf.getBytes(preMasterSecret, "master secret", randoms, 48);
+Record.log("clientRandom   : " + Hex.b2s(clientRandom));
+Record.log("serverRandom   : " + Hex.b2s(serverRandom));
+Record.log("PreMasterSecret: " + Hex.b2s(preMasterSecret));
+Record.log("MasterSecret   : " + Hex.b2s(masterSecret));
     }
 
     /**
@@ -496,13 +471,13 @@ log.debug("MasterSecret   : " + Hex.b2s(m_masterSecret));
     private void generateKeys() throws TLSException {
         byte[] randoms = new byte[64];
 
-        System.arraycopy(m_serverRandom, 0, randoms, 0, 32);
-        System.arraycopy(m_clientRandom, 0, randoms, 32, 32);
-        byte[] keyBlock = m_prf.getBytes(m_masterSecret, "key expansion", randoms, TLSSocket.KEY_BLOCK_LENGTH);
+        System.arraycopy(serverRandom, 0, randoms, 0, 32);
+        System.arraycopy(clientRandom, 0, randoms, 32, 32);
+        byte[] keyBlock = prf.getBytes(masterSecret, "key expansion", randoms, TLSSocket.KEY_BLOCK_LENGTH);
 
         // set write MAC secrets
-log.debug("keyblock       : " + Hex.b2s(keyBlock));
-        m_record.setKeyBlock(m_cipherSuite, keyBlock);
+Record.log("keyblock       : " + Hex.b2s(keyBlock));
+        record.setKeyBlock(cipherSuite, keyBlock);
     }
 
     /**
@@ -512,10 +487,7 @@ log.debug("keyblock       : " + Hex.b2s(keyBlock));
      * @param message the message sent or received
      */
     private void updateHashes(byte[] message) {
-        m_md5.update(message);
-        m_sha.update(message);
+        md5.update(message);
+        sha.update(message);
     }
-
-    
-public static void main(String[] args) throws Exception { TLSSocket.main(args); }
 }

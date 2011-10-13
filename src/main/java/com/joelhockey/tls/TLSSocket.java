@@ -1,17 +1,23 @@
 /*
- * Copyright 2001 Joel Hockey (joel.hockey@gmail.com).  All rights reserved.
+ * Copyright 2001-2011 Joel Hockey (joel.hockey@gmail.com).  All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * THIS SOURCE CODE IS PROVIDED BY JOEL HOCKEY WITH A 30-DAY MONEY BACK
- * GUARANTEE.  IF THIS CODE DOES NOT MEAN WHAT IT SAYS IT MEANS WITHIN THE
- * FIRST 30 DAYS, SIMPLY RETURN THIS CODE IN ORIGINAL CONDITION FOR A PARTIAL
- * REFUND.  IN ADDITION, I WILL REFORMAT THIS CODE USING YOUR PREFERRED
- * BRACE-POSITIONING AND INDENTATION.  THIS WARRANTY IS VOID IF THE CODE IS
- * FOUND TO HAVE BEEN COMPILED.  NO FURTHER WARRANTY IS OFFERED.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 
 package com.joelhockey.tls;
@@ -22,11 +28,11 @@ import java.io.OutputStream;
 import java.net.Socket;
 
 /**
- * Provides a TLS Client Socket connection.  Supports only
- * TLS_RSA_WITH_RC4_128_MD5 without client authentication.
+ * Provides a TLS Client Socket connection.  Supports
+ * TLS_RSA_WITH_RC4_128_MD5, TLS_RSA_WITH_3DES_EDE_CBC_SHA,
+ * and TLS_RSA_WITH_AES_128_CBC_SHA without client authentication.
  *
  *	@author		Joel Hockey
- *	@version	$Revision: 1.1 $
  */
 public class TLSSocket extends java.net.Socket {
 
@@ -36,61 +42,60 @@ public class TLSSocket extends java.net.Socket {
     public static final int TLS_RSA_WITH_RC4_128_MD5 = 0x04;
     public static final int TLS_RSA_WITH_3DES_EDE_CBC_SHA = 0x0A;
     public static final int TLS_RSA_WITH_AES_128_CBC_SHA = 0x2F;
-    // cipher suites supported 
+    // cipher suites supported
     public static final byte[] CIPHER_SUITE = {0x00, 0x06, 0x00, 0x04, 0x00, 0x0a, 0x00, 0x2f};
-    //public static final byte[] CIPHER_SUITE = {0x00, 0x02, 0x00, 0x04}; // rc4
-    //public static final byte[] CIPHER_SUITE = {0x00, 0x02, 0x00, 0x0a}; // des3
-    //public static final byte[] CIPHER_SUITE = {0x00, 0x02, 0x00, 0x2f}; // aes
-    
+//    public static final byte[] CIPHER_SUITE = {0x00, 0x02, 0x00, 0x04}; // rc4
+//    public static final byte[] CIPHER_SUITE = {0x00, 0x02, 0x00, 0x0a}; // des3
+//    public static final byte[] CIPHER_SUITE = {0x00, 0x02, 0x00, 0x2f}; // aes
+
     public static final int KEY_BLOCK_LENGTH = 104;
 
     // Instance variables.
-    private String m_host;
-    private int m_port;
-    private String m_proxyHost;
-    private int m_proxyPort;
+    private String host;
+    private int port;
+    private String proxyHost;
+    private int proxyPort;
     private boolean m_useProxy;
-    private Record m_record;
-    private Handshake m_handshake;
-    private boolean m_connected = false;
-    private TLSInputStream m_tlsInputStream;
-    private TLSOutputStream m_tlsOutputStream;
+    private Record record;
+    private Handshake handshake;
+    private boolean connected = false;
+    private TLSInputStream tlsInputStream;
+    private TLSOutputStream tlsOutputStream;
 
     /**
      * Class constructor.
      *
      * @param   host    The server to connect to.
      * @param   port    The port on the server to connect to.
-     *
      * @throws TLSException if it cannot establish a connection.
      */
     public TLSSocket(String host, int port) throws IOException {
-        m_host = host;
-        m_port = port;
+        this.host = host;
+        this.port = port;
         m_useProxy = false;
 
         // get the TLS objects
-        m_record = new Record(this);
-        m_handshake = new Handshake(this);
-        m_tlsInputStream = new TLSInputStream(this);
-        m_tlsOutputStream = new TLSOutputStream(this);
+        record = new Record(this);
+        handshake = new Handshake(this);
+        tlsInputStream = new TLSInputStream(this);
+        tlsOutputStream = new TLSOutputStream(this);
 
         // start the handshake
         connect();
     }
 
     public TLSSocket(String host, int port, String proxyHost, int proxyPort) throws IOException {
-        m_host = host;
-        m_port = port;
-        m_proxyHost = proxyHost;
-        m_proxyPort = proxyPort;
+        this.host = host;
+        this.port = port;
+        this.proxyHost = proxyHost;
+        this.proxyPort = proxyPort;
         m_useProxy = true;
 
         // get the TLS objects
-        m_record = new Record(this);
-        m_handshake = new Handshake(this);
-        m_tlsInputStream = new TLSInputStream(this);
-        m_tlsOutputStream = new TLSOutputStream(this);
+        record = new Record(this);
+        handshake = new Handshake(this);
+        tlsInputStream = new TLSInputStream(this);
+        tlsOutputStream = new TLSOutputStream(this);
 
         // start the handshake
         connect();
@@ -99,52 +104,41 @@ public class TLSSocket extends java.net.Socket {
     protected void connect() throws IOException {
         Socket s;
         if (m_useProxy) {
-            s = new Socket(m_proxyHost, m_proxyPort);
+            s = new Socket(proxyHost, proxyPort);
             doProxyTunnel(s);
         } else {
-            s = new Socket(m_host, m_port);
+            s = new Socket(host, port);
         }
-        m_record.setSocket(s);
-        m_handshake.handshake();
-        m_connected = true;
+        record.setSocket(s);
+        handshake.handshake();
+        connected = true;
     }
 
     protected void readAvailable() throws IOException {
-        while (m_record.available()) {
-            byte[] frag = m_record.readRecord();
+        while (record.available()) {
+            byte[] frag = record.readRecord();
             if (frag != null) {
-                m_tlsInputStream.addBytes(frag);
+                tlsInputStream.addBytes(frag);
             }
         }
     }
 
     protected void readBlock() throws IOException {
-        byte[] frag = m_record.readRecord();
+        byte[] frag = record.readRecord();
         if (frag != null) {
-            m_tlsInputStream.addBytes(frag);
+            tlsInputStream.addBytes(frag);
         }
     }
 
-    /* ========================================================================
-     *
-     * Methods
-     */
-    public InputStream getInputStream() { return m_tlsInputStream; }
-
-    public OutputStream getOutputStream() { return m_tlsOutputStream; }
-
-    public void close() throws IOException {
-        m_record.close();
-    }
-    
-    public boolean connected() { return m_connected; }
-
-    public void setConnected(boolean b) { m_connected = b; }
-
-    protected Record getRecord() { return m_record; }
+    public InputStream getInputStream() { return tlsInputStream; }
+    public OutputStream getOutputStream() { return tlsOutputStream; }
+    public void close() throws IOException { record.close(); }
+    public boolean connected() { return connected; }
+    public void setConnected(boolean b) { connected = b; }
+    protected Record getRecord() { return record; }
 
     private void doProxyTunnel(Socket s) throws IOException {
-        String req = "CONNECT " + m_host + ":" + m_port + " HTTP/1.0\r\n"
+        String req = "CONNECT " + host + ":" + port + " HTTP/1.0\r\n"
             + "User-Agent: TLSSocket By Joel Hockey\r\n"
             + "\r\n";
 
@@ -157,8 +151,8 @@ public class TLSSocket extends java.net.Socket {
 
         String res = new String(buf, 0, i);
         if (res.indexOf("200") < 0) {
-            throw new TLSException("Could not tunnel through proxy " + m_proxyHost
-                + ":" + m_proxyPort + ".  Got response " + res);
+            throw new TLSException("Could not tunnel through proxy " + proxyHost
+                + ":" + proxyPort + ".  Got response " + res);
         }
     }
 

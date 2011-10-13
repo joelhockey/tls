@@ -1,37 +1,41 @@
 /*
- * Copyright 2001 Joel Hockey (joel.hockey@gmail.com).  All rights reserved.
+ * Copyright 2001-2011 Joel Hockey (joel.hockey@gmail.com).  All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * THIS SOURCE CODE IS PROVIDED BY JOEL HOCKEY WITH A 30-DAY MONEY BACK
- * GUARANTEE.  IF THIS CODE DOES NOT MEAN WHAT IT SAYS IT MEANS WITHIN THE
- * FIRST 30 DAYS, SIMPLY RETURN THIS CODE IN ORIGINAL CONDITION FOR A PARTIAL
- * REFUND.  IN ADDITION, I WILL REFORMAT THIS CODE USING YOUR PREFERRED
- * BRACE-POSITIONING AND INDENTATION.  THIS WARRANTY IS VOID IF THE CODE IS
- * FOUND TO HAVE BEEN COMPILED.  NO FURTHER WARRANTY IS OFFERED.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
- 
+
 package com.joelhockey.tls;
 
-import java.security.*;
+import java.security.MessageDigest;
 
 /**
- * Perfroms the HMAC as defined by RFC 2104
- *
+ * Performs HMAC as defined by RFC 2104
  *	@author		Joel Hockey
  */
 public class HMAC {
 
-    private byte[] m_k_ipad = new byte[64];
-    private byte[] m_k_opad = new byte[64];
-    MessageDigest m_md = null;
+    private byte[] k_ipad = new byte[64];
+    private byte[] k_opad = new byte[64];
+    MessageDigest md = null;
 
     /**
      * Class constructor specifying the MessageDigest and secret to use
-     *
      * @param md        the MessageDigest (MD5 or SHA1).
      * @param secret    the secret to seed the md.
      */
@@ -40,22 +44,15 @@ public class HMAC {
         setKey(key);
     }
 
-    /* ========================================================================
-     *
-     * Methods
-     */
-
     /** Set the MessageDigest for HMAC
-     *
      * @param md    the MessageDigest
      */
     public void setMD(MessageDigest md) {
-        m_md = md;
+        this.md = md;
     }
 
     /**
      * Set the secret key for HMAC
-     *
      * @param key   the key.
      */
      public void setKey(byte[] key) {
@@ -69,35 +66,33 @@ public class HMAC {
         }
 
         // if the key is longer than 64 bytes then hash it.
-        byte[] tempKey = keyLength > 64 ? m_md.digest(key) : key;
+        byte[] tempKey = keyLength > 64 ? md.digest(key) : key;
 
         // get m_k_ipad and m_k_opad
         for (int i = 0; i < keyLength; i++) {
-            m_k_ipad[i] = (byte) (0x36 ^ tempKey[i]);
-            m_k_opad[i] = (byte) (0x5C ^ tempKey[i]);
+            k_ipad[i] = (byte) (0x36 ^ tempKey[i]);
+            k_opad[i] = (byte) (0x5C ^ tempKey[i]);
         }
 
         for (int i = keyLength; i < 64; i++) {
-            m_k_ipad[i] = 0x36;
-            m_k_opad[i] = 0x5C;
+            k_ipad[i] = 0x36;
+            k_opad[i] = 0x5C;
         }
     }
 
     /**
      * Digest the HMAC
-     *
      * @param input the byte array input
-     *
-     * @return byte[] the HMAC value
+     * @return HMAC value
      */
     public byte[] digest(byte[] input) {
 
-        m_md.reset();
-        m_md.update(m_k_ipad);
-        m_md.update(input);
-        byte[] inner = m_md.digest();
-        m_md.update(m_k_opad);
-        m_md.update(inner);
-        return m_md.digest();
+        md.reset();
+        md.update(k_ipad);
+        md.update(input);
+        byte[] inner = md.digest();
+        md.update(k_opad);
+        md.update(inner);
+        return md.digest();
     }
 }

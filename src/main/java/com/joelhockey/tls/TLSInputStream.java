@@ -1,99 +1,103 @@
 /*
- * Copyright 2001 Joel Hockey (joel.hockey@gmail.com).  All rights reserved.
+ * Copyright 2001-2011 Joel Hockey (joel.hockey@gmail.com).  All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * THIS SOURCE CODE IS PROVIDED BY JOEL HOCKEY WITH A 30-DAY MONEY BACK
- * GUARANTEE.  IF THIS CODE DOES NOT MEAN WHAT IT SAYS IT MEANS WITHIN THE
- * FIRST 30 DAYS, SIMPLY RETURN THIS CODE IN ORIGINAL CONDITION FOR A PARTIAL
- * REFUND.  IN ADDITION, I WILL REFORMAT THIS CODE USING YOUR PREFERRED
- * BRACE-POSITIONING AND INDENTATION.  THIS WARRANTY IS VOID IF THE CODE IS
- * FOUND TO HAVE BEEN COMPILED.  NO FURTHER WARRANTY IS OFFERED.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 
 package com.joelhockey.tls;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
 
 /**
  * Input Stream for TLS Socket
- *
  *	@author		Joel Hockey
- *	@version	$Revision: 1.1 $
  */
 public class TLSInputStream extends InputStream {
 
-    // Instance variables
-    private TLSSocket m_tls;
-    private byte[] m_buf = new byte[4096];
-    private int m_start = 0;
-    private int m_end = 0;
-    private int m_available = 0;
+    private TLSSocket tls;
+    private byte[] tlsbuf = new byte[4096];
+    private int start = 0;
+    private int end = 0;
+    private int available = 0;
 
     public TLSInputStream(TLSSocket tls) {
-        m_tls = tls;
+        this.tls = tls;
     }
 
     public int read() throws IOException {
-        int len = read(m_buf, m_start, 1);
+        int len = read(tlsbuf, start, 1);
         if (len == -1) {
             return -1;
         }
-        return m_buf[m_start++] & 0xff;
+        return tlsbuf[start++] & 0xff;
     }
 
     public int read(byte[] buf, int offset, int len) throws IOException {
         // update any new data that has arrived
         check();
 
-        if (m_available == 0) {
+        if (available == 0) {
             return -1;
         }
 
-        int retval = m_available < len ? m_available : len;
-        System.arraycopy(m_buf, m_start, buf, offset, retval);
-        m_start+= retval;
-        m_available -= retval;
+        int retval = available < len ? available : len;
+        System.arraycopy(tlsbuf, start, buf, offset, retval);
+        start+= retval;
+        available -= retval;
         return retval;
     }
 
     public int available() {
-        return m_available;
+        return available;
     }
 
     protected void addBytes(byte[] in) {
         // check if we have enough room.
-        if (m_available + in.length > m_buf.length) {
-            byte[] temp = new byte[m_buf.length + (in.length << 1)];
-            System.arraycopy(m_buf, m_start, temp, 0, m_available);
-            m_buf = temp;
+        if (available + in.length > tlsbuf.length) {
+            byte[] temp = new byte[tlsbuf.length + (in.length << 1)];
+            System.arraycopy(tlsbuf, start, temp, 0, available);
+            tlsbuf = temp;
         }
 
         // check if in will fit at end
-        if (m_end + in.length > m_buf.length) {
-            byte[] temp = new byte[m_buf.length];
-            System.arraycopy(m_buf, m_start, temp, 0, m_available);
-            m_start = 0; m_end = m_available;
-            m_buf = temp;
+        if (end + in.length > tlsbuf.length) {
+            byte[] temp = new byte[tlsbuf.length];
+            System.arraycopy(tlsbuf, start, temp, 0, available);
+            start = 0; end = available;
+            tlsbuf = temp;
         }
 
         // copy to end
-        System.arraycopy(in, 0, m_buf, m_end, in.length);
-        m_end += in.length;
-        m_available += in.length;
+        System.arraycopy(in, 0, tlsbuf, end, in.length);
+        end += in.length;
+        available += in.length;
     }
 
     private void check() throws IOException {
-        m_tls.readAvailable();
+        tls.readAvailable();
 
-        if (m_available == 0) {
+        if (available == 0) {
             // force a read
-            m_tls.readBlock();
+            tls.readBlock();
             // keep reading if we can
-            m_tls.readAvailable();
+            tls.readAvailable();
         }
     }
 }

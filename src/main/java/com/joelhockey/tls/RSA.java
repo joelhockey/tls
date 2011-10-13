@@ -1,43 +1,48 @@
 /*
- * Copyright 2001 Joel Hockey (joel.hockey@gmail.com).  All rights reserved.
+ * Copyright 2001-2011 Joel Hockey (joel.hockey@gmail.com).  All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * THIS SOURCE CODE IS PROVIDED BY JOEL HOCKEY WITH A 30-DAY MONEY BACK
- * GUARANTEE.  IF THIS CODE DOES NOT MEAN WHAT IT SAYS IT MEANS WITHIN THE
- * FIRST 30 DAYS, SIMPLY RETURN THIS CODE IN ORIGINAL CONDITION FOR A PARTIAL
- * REFUND.  IN ADDITION, I WILL REFORMAT THIS CODE USING YOUR PREFERRED
- * BRACE-POSITIONING AND INDENTATION.  THIS WARRANTY IS VOID IF THE CODE IS
- * FOUND TO HAVE BEEN COMPILED.  NO FURTHER WARRANTY IS OFFERED.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 
 package com.joelhockey.tls;
 
-import java.math.*;
-import java.util.*;
+import java.math.BigInteger;
+import java.util.Random;
 
 /**
  * Does RSA encryption
- *
  *  @author Joel Hockey
  */
 public class RSA {
 
     // Instance variables
-    private byte[] m_certs;
-    private int m_offset;
+    private byte[] certs;
+    private int certsOffset;
 
-    private BigInteger m_modulus;
-    private BigInteger m_exponent;
-    private int m_keysize;
+    private BigInteger modulus;
+    private BigInteger exponent;
+    private int keysize;
 
-    private Random m_random;
+    private Random random;
 
     public RSA() {
-        m_random = new Random();
+        random = new Random();
     }
 
     /**
@@ -72,76 +77,76 @@ public class RSA {
      *      publicExponent INTEGER }
      */
     public void setCertificates(byte[] buf, int offset , int len) {
-        m_certs = buf;
-        m_offset = offset;
+        certs = buf;
+        certsOffset = offset;
         int asnlen = 0;
 
         // Certificate, TBSCertificate
         for (int i = 0; i < 2; i++) {
-            m_offset++;
+            certsOffset++;
             asnlen = readLengthFromBuf();
         }
 
         // check for version
-        if ((buf[m_offset] & 0x80) > 0) {
-            m_offset++;
-            m_offset++;
+        if ((buf[certsOffset] & 0x80) > 0) {
+            certsOffset++;
+            certsOffset++;
             asnlen = readLengthFromBuf();
-            m_offset += asnlen;
+            certsOffset += asnlen;
         }
 
         // TBSCertificate - serialNumber, signature, issuer, validity, subject
         for (int i = 0; i < 5; i++) {
-            m_offset++;
+            certsOffset++;
             asnlen = readLengthFromBuf();
-            m_offset += asnlen;
+            certsOffset += asnlen;
         }
 
         // TBSCertificate - SubjectPublicKeyInfo
-        m_offset++;
+        certsOffset++;
         asnlen = readLengthFromBuf();
         // TBSCertificate - SubjectPublicKeyInfo - algorithm
-        m_offset++;
+        certsOffset++;
         asnlen = readLengthFromBuf();
-        m_offset += asnlen;
+        certsOffset += asnlen;
 
         // TBSCertificate - SubjectPublicKeyInfo - BitString
-        m_offset++;
+        certsOffset++;
         asnlen = readLengthFromBuf();
 
         // TBSCertificate - SubjectPublicKeyInfo - BitString - RSAPublicKey
-        m_offset++;
-        m_offset++;
+        certsOffset++;
+        certsOffset++;
         asnlen = readLengthFromBuf();
 
         // TBSCertificate - SubjectPublicKeyInfo - RSAPublicKey - modulus
-        m_offset++;
+        certsOffset++;
         int modLen = readLengthFromBuf();
         byte[] mod = new byte[modLen];
-        System.arraycopy(m_certs, m_offset, mod, 0, modLen);
-        m_offset+= modLen;
-        m_modulus = new BigInteger(1, mod);
+        System.arraycopy(certs, certsOffset, mod, 0, modLen);
+        certsOffset+= modLen;
+        modulus = new BigInteger(1, mod);
         int i = 0;
-        m_keysize = modLen;
+        keysize = modLen;
         while (mod[i++] == 0) {
-            m_keysize--;
+            keysize--;
         }
 
         // TBSCertificate - SubjectPublicKeyInfo - RSAPublicKey - exponent
-        m_offset++;
+        certsOffset++;
         int expLen = readLengthFromBuf();
         byte[] exp = new byte[expLen];
-        System.arraycopy(m_certs, m_offset, exp, 0, expLen);
-        m_offset+= expLen;
-        m_exponent = new BigInteger(1, exp);
+        System.arraycopy(certs, certsOffset, exp, 0, expLen);
+        certsOffset+= expLen;
+        exponent = new BigInteger(1, exp);
     }
 
     public byte[] encrypt(byte[] in) {
         // pkcs1 padding
-        byte[] temp = new byte[m_keysize - 1];
+        byte[] temp = new byte[keysize - 1];
         for (int i = 0; i < temp.length; i++) {
             // make sure there are no bytes with value 0
-            temp[i] = (byte) (m_random.nextInt(255) + 1);
+            temp[i] = (byte) (random.nextInt(255) + 1);
         }
         temp[0] = 0x02;
         temp[temp.length - in.length - 1] = 0x00;
@@ -149,13 +154,13 @@ public class RSA {
         System.arraycopy(in, 0, temp, temp.length - in.length, in.length);
 
         BigInteger bi = new BigInteger(1, temp);
-        BigInteger retval = bi.modPow(m_exponent, m_modulus);
+        BigInteger retval = bi.modPow(exponent, modulus);
         byte[] out = retval.toByteArray();
-        
+
         // chop off extra zero from front if needed
-        if (out.length > m_keysize) {
-            byte[] b = new byte[m_keysize];
-            System.arraycopy(out, out.length - m_keysize, b, 0, m_keysize);
+        if (out.length > keysize) {
+            byte[] b = new byte[keysize];
+            System.arraycopy(out, out.length - keysize, b, 0, keysize);
             return b;
         } else {
             return out;
@@ -163,7 +168,7 @@ public class RSA {
     }
 
     private int readLengthFromBuf() {
-        int len = m_certs[m_offset++] & 0xff;
+        int len = certs[certsOffset++] & 0xff;
         if (len < 128) {
             return len;
         } else {
@@ -171,7 +176,7 @@ public class RSA {
             int retval = 0;
             for (int i = 0; i < len; i++) {
                 retval <<= 8;
-                retval += m_certs[m_offset++] & 0xff;
+                retval += certs[certsOffset++] & 0xff;
             }
             return retval;
         }
