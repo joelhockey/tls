@@ -20,16 +20,34 @@
  * THE SOFTWARE.
  */
 
-package com.joelhockey.tls;
+package net.java.jless.tls;
 
 import java.io.IOException;
+import java.io.OutputStream;
 
 /**
- * General Exception for TLS
+ * OutputStream for TLSSocket
  *	@author		Joel Hockey
  */
-public class TLSException extends IOException {
-    public TLSException(String msg) {
-        super(msg);
+public class TLSOutputStream extends OutputStream {
+
+    // Instance variables
+    private TLSSocket tls;
+    public TLSOutputStream(TLSSocket tls) {
+        this.tls = tls;
+    }
+
+    public void write(int i) throws IOException {
+        write(new byte[]{(byte)i}, 0, 1);
+    }
+
+    public void write(byte[] msg, int offset, int len) throws IOException {
+        // check for any alerts or other messages that may have arrived
+        tls.readAvailable();
+
+        if (!tls.connected()) {
+            tls.connect();
+        }
+        tls.getRecord().sendMessage(Record.CONTENTTYPE_APPLICATION_DATA, msg);
     }
 }

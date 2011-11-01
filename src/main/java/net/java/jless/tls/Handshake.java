@@ -20,7 +20,7 @@
  * THE SOFTWARE.
  */
 
-package com.joelhockey.tls;
+package net.java.jless.tls;
 
 import java.io.ByteArrayOutputStream;
 import java.security.MessageDigest;
